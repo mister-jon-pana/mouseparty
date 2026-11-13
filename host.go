@@ -30,6 +30,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -211,6 +212,7 @@ func (h *Host) start() error {
 	if err != nil {
 		return err
 	}
+	os.WriteFile(filepath.Join(tmp, "owner"), []byte(strconv.Itoa(os.Getpid())), 0o644) // whose it is (proc_windows.go killLeftovers)
 	h.mu.Lock()
 	h.key = base64.RawURLEncoding.EncodeToString(key)
 	h.ports = map[string]int{"api": freePort(), "rtsp": freePort(), "hls": freePort(), "webrtc": freePort()}
@@ -240,17 +242,18 @@ func (h *Host) start() error {
 		}
 	}
 	if h.MapPorts {
-		h.mapper = NewPortMapper(h.Log, gw)
-		opened := h.mapper.Map(h.HTTPPort, "TCP")
-		opened = h.mapper.Map(h.ICEPort, "UDP") && opened
-		opened = h.mapper.Map(h.ICEPort, "TCP") && opened
-		if h.mapper.PublicIP != "" && isPublic(h.mapper.PublicIP) {
-			public = h.mapper.PublicIP
+		mapper := NewPortMapper(h.Log, gw) // its own: a Stop meanwhile takes h.mapper away
+		h.mapper = mapper
+		opened := mapper.Map(h.HTTPPort, "TCP")
+		opened = mapper.Map(h.ICEPort, "UDP") && opened
+		opened = mapper.Map(h.ICEPort, "TCP") && opened
+		if mapper.PublicIP != "" && isPublic(mapper.PublicIP) {
+			public = mapper.PublicIP
 		}
 		if opened && public != "" {
-			h.Log(h.mapper.Describe())
+			h.Log(mapper.Describe())
 		} else {
-			h.problem = h.mapper.Describe()
+			h.problem = mapper.Describe()
 		}
 	}
 

@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -115,14 +116,29 @@ func stopGroup(cmd *exec.Cmd) {
 }
 
 // killLeftovers: tools in the job never outlive the app, so there are none of them; only the
-// folders a crashed session left (their config; never a key). One still in use won't delete.
+// folders a crashed session left (their config; never a key), each named by its app's process
+// (its "owner" file) and deleted once that has gone
 func (h *Host) killLeftovers() {
 	dirs, _ := filepath.Glob(filepath.Join(os.TempDir(), "mouseparty-host-*"))
 	for _, d := range dirs {
-		if st, err := os.Stat(d); err == nil && time.Since(st.ModTime()) > time.Minute {
-			os.RemoveAll(d)
+		b, err := os.ReadFile(filepath.Join(d, "owner"))
+		pid, _ := strconv.Atoi(strings.TrimSpace(string(b)))
+		if err != nil || pid == 0 || pid == os.Getpid() || running(pid) {
+			continue
 		}
+		os.RemoveAll(d)
 	}
+}
+
+// running: a process with this id is still there
+func running(pid int) bool {
+	p, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid))
+	if err != nil {
+		return false
+	}
+	defer windows.CloseHandle(p)
+	var code uint32
+	return windows.GetExitCodeProcess(p, &code) == nil && code == 259 // STILL_ACTIVE
 }
 
 var errNoSite = errors.New("the viewer site runs inside the app on Windows")
