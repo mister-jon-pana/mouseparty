@@ -35,6 +35,9 @@ jobs:
       run:
         shell: pwsh
     steps:
+      - name: Keep line endings as committed (the tests read the sources)
+        run: git config --global core.autocrlf false
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
