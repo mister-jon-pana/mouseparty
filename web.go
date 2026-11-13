@@ -31,8 +31,8 @@ var ephemeral = map[string]string{"Cache-Control": "no-store", "X-Robots-Tag": "
 // viewerFiles: the app bundle's Resources/host_web, read on every request, so a
 // viewer-page fix can go live by copying files in; else the copy built into the app
 func viewerFiles() fs.FS {
-	if exe, err := os.Executable(); err == nil {
-		dir := filepath.Join(filepath.Dir(exe), "..", "Resources", "host_web")
+	if r := resourcesDir(); r != "" {
+		dir := filepath.Join(r, "host_web")
 		if _, err := os.Stat(filepath.Join(dir, "viewer.html")); err == nil {
 			return os.DirFS(dir)
 		}

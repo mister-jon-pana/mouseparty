@@ -43,6 +43,9 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "--selftest" {
 		os.Exit(selftest())
 	}
+	if len(os.Args) > 1 && os.Args[1] == afterEraseArg { // Windows: Erase All Data's last step (proc_windows.go)
+		os.Exit(afterEraseMain())
+	}
 	if len(os.Args) > 1 && os.Args[1] == siteArg { // the viewer site, in its sandbox, started by the app (site.go)
 		os.Exit(siteMain())
 	}

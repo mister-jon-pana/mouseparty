@@ -9,10 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strconv"
-	"syscall"
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -124,30 +121,6 @@ func erasable() []string {
 		dirs = append(dirs, filepath.Join(d, "Mouse Party"))
 	}
 	return dirs
-}
-
-// afterErase: once this process has gone, what it couldn't delete while it ran (its window's
-// place and the web view's own storage, which AppKit and WebKit write as it quits), then the app
-// opened again, if it's an app (bundle "": wails dev, only the deleting)
-func afterErase(bundle string) {
-	const id = "io.github.ftrain.mouseparty" // packaging/darwin/Info.plist
-	home, _ := os.UserHomeDir()
-	lib := filepath.Join(home, "Library")
-	var paths []string
-	for _, p := range []string{"WebKit/" + id, "Caches/" + id, "HTTPStorages/" + id, "HTTPStorages/" + id + ".binarycookies",
-		"Saved Application State/" + id + ".savedState"} {
-		paths = append(paths, filepath.Join(lib, p))
-	}
-	paths = append(paths, erasable()...)
-	script := `while kill -0 "$0" 2>/dev/null; do sleep 0.2; done
-/usr/bin/defaults delete "$1" 2>/dev/null
-shift 2
-bundle=$1; shift
-rm -rf "$@"
-[ -n "$bundle" ] && exec /usr/bin/open "$bundle"`
-	cmd := exec.Command("/bin/sh", append([]string{"-c", script, strconv.Itoa(os.Getpid()), id, bundle}, paths...)...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} // not stopped with us
-	cmd.Start()
 }
 
 // opened: the party is open; what was waiting on it starts (with a.locked still set while it does)

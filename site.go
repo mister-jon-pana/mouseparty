@@ -41,7 +41,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 	"unicode/utf8"
 
@@ -136,24 +135,6 @@ type siteProc struct {
 	kept  atomic.Int64 // bytes of pictures it has put in the party file
 }
 
-// socketPair: two ends of a socket, for the app and the site
-func socketPair(kind int) (ours net.Conn, theirs *os.File, err error) {
-	syscall.ForkLock.RLock()
-	fds, err := syscall.Socketpair(syscall.AF_UNIX, kind, 0)
-	if err == nil {
-		syscall.CloseOnExec(fds[0])
-		syscall.CloseOnExec(fds[1])
-	}
-	syscall.ForkLock.RUnlock()
-	if err != nil {
-		return nil, nil, err
-	}
-	f := os.NewFile(uintptr(fds[0]), "site")
-	ours, err = net.FileConn(f)
-	f.Close()
-	return ours, os.NewFile(uintptr(fds[1]), "site"), err
-}
-
 // startSite: the site's port taken here (so it's this that says if it can't be), and the site started to answer on it
 func (h *Host) startSite() error {
 	l, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", h.HTTPPort))
@@ -182,17 +163,17 @@ func (h *Host) launchSite() error {
 		return err
 	}
 	defer listening.Close()
-	toSite, siteIn, err := socketPair(syscall.SOCK_STREAM)
+	toSite, siteIn, err := socketPair(false)
 	if err != nil {
 		return err
 	}
 	defer siteIn.Close()
-	fromSite, siteOut, err := socketPair(syscall.SOCK_STREAM)
+	fromSite, siteOut, err := socketPair(false)
 	if err != nil {
 		return err
 	}
 	defer siteOut.Close()
-	files, siteFiles, err := socketPair(syscall.SOCK_DGRAM)
+	files, siteFiles, err := socketPair(true)
 	if err != nil {
 		return err
 	}
@@ -211,7 +192,7 @@ func (h *Host) launchSite() error {
 	if setup.Pandoc != "" {
 		setup.Pandoc = realPath(setup.Pandoc)
 	}
-	resources := filepath.Join(filepath.Dir(exe), "..", "Resources") // the app's own: the pages, the tools
+	resources := resourcesDir() // the app's own: the pages, the tools
 	if st, err := os.Stat(resources); err != nil || !st.IsDir() {
 		resources = ""
 	}
@@ -332,8 +313,7 @@ func (s *siteProc) tell(t SiteTell) error {
 	if t.Do == "doc" {
 		if f, err := os.Open(t.Doc.Path); err == nil {
 			if st, err := f.Stat(); err == nil && st.Mode().IsRegular() {
-				_, _, err = s.files.WriteMsgUnix([]byte(t.Doc.Token), syscall.UnixRights(int(f.Fd())), nil)
-				t.File = err == nil
+				t.File = sendFile(s.files, t.Doc.Token, f) == nil
 			}
 			f.Close()
 		}
@@ -536,30 +516,6 @@ func (s *siteSide) event(kind, text string, n int) {
 	select {
 	case s.events <- SiteEvent{Kind: kind, Text: text, N: n}:
 	default: // the app isn't taking them: it has stopped, or is about to stop us
-	}
-}
-
-// takeFiles: each document's file arrives open, named by the document's token
-func (s *siteSide) takeFiles(c *net.UnixConn) {
-	name, oob := make([]byte, 256), make([]byte, syscall.CmsgSpace(4*4))
-	for {
-		n, oobn, _, _, err := c.ReadMsgUnix(name, oob)
-		if err != nil {
-			return
-		}
-		msgs, _ := syscall.ParseSocketControlMessage(oob[:oobn])
-		for _, m := range msgs {
-			fds, _ := syscall.ParseUnixRights(&m)
-			for _, fd := range fds {
-				syscall.CloseOnExec(fd)
-				s.mu.Lock()
-				if old := s.handed[string(name[:n])]; old != nil {
-					old.Close()
-				}
-				s.handed[string(name[:n])] = os.NewFile(uintptr(fd), "document")
-				s.mu.Unlock()
-			}
-		}
 	}
 }
 

@@ -26,7 +26,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -188,7 +187,7 @@ func stagingDir(bundle string) string {
 
 // autoUpdate: once a day, if Settings says so; downloading what it finds if Settings says that too
 func (a *App) autoUpdate() {
-	if a.locked || !a.cfg.CheckUpdates || version == "dev" || time.Since(a.update.checked) < updateEvery {
+	if a.locked || !selfUpdates || !a.cfg.CheckUpdates || version == "dev" || time.Since(a.update.checked) < updateEvery {
 		return
 	}
 	a.checkUpdates(a.cfg.InstallUpdates)
@@ -208,6 +207,10 @@ func (a *App) checkUpdates(install bool) {
 	}
 	if version == "dev" {
 		u.state, u.note = "error", "A development build doesn't update."
+		return
+	}
+	if !selfUpdates {
+		u.state, u.note = "error", "Mouse Party for Windows doesn't update itself: a new version is a new MouseParty.exe."
 		return
 	}
 	u.state, u.checked = "checking", time.Now()
@@ -376,13 +379,6 @@ func (a *App) RestartToUpdate() {
 	if ready && a.ctx != nil {
 		runtime.Quit(a.ctx)
 	}
-}
-
-// reopen opens the app at path once this process has gone (Restart to Update)
-func reopen(path string) {
-	cmd := exec.Command("/bin/sh", "-c", `sleep 1; exec /usr/bin/open "$0"`, path)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} // not stopped with us
-	cmd.Start()
 }
 
 // updateStatus: what Settings says

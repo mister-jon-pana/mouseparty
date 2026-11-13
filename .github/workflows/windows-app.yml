@@ -1,0 +1,115 @@
+# Build Mouse Party for Windows (MouseParty.exe, with ffmpeg, MediaMTX and cloudflared
+# beside it in Resources\bin) on a Windows runner, check it hosts (--selftest), and keep
+# MouseParty-windows-x64.zip as the run's artifact (Actions tab > the run > Artifacts).
+# Runs on every push to the windows branch, and by hand (workflow_dispatch).
+#
+# What's left out next to the Mac build: the sandbox (Windows has no Seatbelt: the viewer
+# site, MediaMTX, cloudflared and ffmpeg run unboxed), updates (a new version is a new
+# zip), and Datasette (its WebAssembly Python is built on a Mac only), so a database
+# dropped in says it can't be shown. ffmpeg is BtbN's GPL build, not the app's own.
+name: Windows app
+
+on:
+  push:
+    branches: [windows]
+  workflow_dispatch:
+
+concurrency:
+  group: windows-app-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MEDIAMTX: v1.21.3
+  MEDIAMTX_SHA256: b2f5246b07cb72961df03b8d5e8cad43dc657bcf3f49a87bb031bdf22721af74   # mediamtx_v1.21.3_windows_amd64.zip, its release's checksums.sha256
+  CLOUDFLARED: 2026.10.3
+  CLOUDFLARED_SHA256: 76b2805253d0d6ffacb092a7acfbee99e7af6917835c0c5410e23f3ef5052da2  # cloudflared-windows-amd64.exe as downloaded 2026-11-13
+  PANDOC: '3.13'
+  PANDOC_SHA256: 234d2020a7f3a9aab387bd35df3c17ca2ba0078a82490e2b3ede890d648d64fe      # scripts/fetch_pandoc.sh's
+  FFMPEG_ZIP: ffmpeg-n8.1-latest-win64-gpl-8.1.zip                                      # BtbN/FFmpeg-Builds, its "latest" tag
+  WAILS: github.com/wailsapp/wails/v2/cmd/wails@v2.17.1
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: ffmpeg, MediaMTX, cloudflared and pandoc
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProgressPreference = 'SilentlyContinue'
+          function Get-Checked($url, $file, $sum) {
+            Invoke-WebRequest -Uri $url -OutFile $file
+            $got = (Get-FileHash -Algorithm SHA256 $file).Hash.ToLower()
+            if ($sum -and $got -ne $sum) { throw "$file isn't the release it should be ($got)" }
+            Write-Host "$file  $got"
+          }
+          $res = "dist\MouseParty\Resources"
+          New-Item -ItemType Directory -Force "$res\bin", "$res\wasm", "dl" | Out-Null
+          Get-Checked "https://github.com/bluenviron/mediamtx/releases/download/$env:MEDIAMTX/mediamtx_$($env:MEDIAMTX)_windows_amd64.zip" dl\mediamtx.zip $env:MEDIAMTX_SHA256
+          Expand-Archive dl\mediamtx.zip dl\mediamtx
+          Copy-Item dl\mediamtx\mediamtx.exe "$res\bin\"
+          Get-Checked "https://github.com/cloudflare/cloudflared/releases/download/$env:CLOUDFLARED/cloudflared-windows-amd64.exe" "$res\bin\cloudflared.exe" $env:CLOUDFLARED_SHA256
+          Get-Checked "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/$env:FFMPEG_ZIP" dl\ffmpeg.zip ''
+          Expand-Archive dl\ffmpeg.zip dl\ffmpeg
+          $ff = Get-ChildItem dl\ffmpeg -Directory | Select-Object -First 1
+          Copy-Item "$($ff.FullName)\bin\ffmpeg.exe" "$res\bin\"
+          New-Item -ItemType Directory -Force dist\MouseParty\Licenses\ffmpeg | Out-Null
+          Copy-Item "$($ff.FullName)\LICENSE.txt" dist\MouseParty\Licenses\ffmpeg\
+          Get-Checked "https://github.com/jgm/pandoc/releases/download/$env:PANDOC/pandoc-$env:PANDOC-wasm.zip" dl\pandoc.zip $env:PANDOC_SHA256
+          Expand-Archive dl\pandoc.zip dl\pandoc
+          Copy-Item "dl\pandoc\pandoc-$env:PANDOC-wasm\pandoc.wasm" "$res\wasm\"
+          & "$res\bin\ffmpeg.exe" -hide_banner -filters | Select-String -Pattern ' (drawtext|subtitles|showcqt|lagfun) '
+
+      - name: Build MouseParty.exe
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = "windows-" + "${{ github.sha }}".Substring(0, 7)
+          go run $env:WAILS build -platform windows/amd64 -skipbindings -trimpath -clean -ldflags "-X main.version=$version"
+          if ($LASTEXITCODE -ne 0) { throw "wails build failed" }
+          Copy-Item packaging\bin\MouseParty.exe dist\MouseParty\
+          Copy-Item -Recurse host_web dist\MouseParty\Resources\host_web
+          Copy-Item -Recurse -Force licenses\* dist\MouseParty\Licenses\
+          Copy-Item LICENSE dist\MouseParty\Licenses\MouseParty-LICENSE.txt
+
+      - name: Self-test (hosts on free ports, plays a countdown, stops)
+        timeout-minutes: 5
+        run: |
+          $p = Start-Process -FilePath dist\MouseParty\MouseParty.exe -ArgumentList '--selftest' -Wait -PassThru -NoNewWindow `
+            -RedirectStandardOutput selftest.txt -RedirectStandardError selftest-err.txt
+          Get-Content selftest.txt, selftest-err.txt
+          if ($p.ExitCode -ne 0) { throw "self-test failed ($($p.ExitCode))" }
+
+      - name: go vet
+        continue-on-error: true
+        run: go vet ./...
+
+      - name: go test -short (Mac-only tests may fail here; reported, not fatal)
+        continue-on-error: true
+        timeout-minutes: 20
+        run: |
+          $env:PATH = "$PWD\dist\MouseParty\Resources\bin;$env:PATH"
+          go test -short -count=1 ./... 2>&1 | Select-Object -Last 120
+
+      - name: Zip
+        run: Compress-Archive -Path dist\MouseParty -DestinationPath MouseParty-windows-x64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MouseParty-windows-x64
+          path: MouseParty-windows-x64.zip
+          retention-days: 30
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: selftest-log
+          path: selftest*.txt
+          if-no-files-found: ignore

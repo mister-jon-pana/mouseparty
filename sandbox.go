@@ -47,7 +47,13 @@ func sandboxing() bool {
 		return false
 	}
 	if _, err := os.Stat(sandboxExec); err != nil {
-		sandboxNone.Do(func() { fmt.Fprintln(os.Stderr, "No "+sandboxExec+" on this Mac: running without the sandbox.") })
+		sandboxNone.Do(func() {
+			if onMac {
+				fmt.Fprintln(os.Stderr, "No "+sandboxExec+" on this Mac: running without the sandbox.")
+			} else {
+				fmt.Fprintln(os.Stderr, "Windows has no sandbox for Mouse Party: the viewer site, MediaMTX, cloudflared and ffmpeg run unboxed.")
+			}
+		})
 		return false
 	}
 	return true
@@ -133,10 +139,14 @@ func (b *box) argv(args ...string) (string, []string) {
 
 func (b *box) command(ctx context.Context, args ...string) *exec.Cmd {
 	bin, argv := b.argv(args...)
+	var cmd *exec.Cmd
 	if ctx == nil {
-		return exec.Command(bin, argv...)
+		cmd = exec.Command(bin, argv...)
+	} else {
+		cmd = exec.CommandContext(ctx, bin, argv...)
 	}
-	return exec.CommandContext(ctx, bin, argv...)
+	hidden(cmd) // no console window on Windows (proc_windows.go)
+	return cmd
 }
 
 // realPath: the path the system knows a file by (the sandbox matches on that: /var is /private/var),

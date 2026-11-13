@@ -29,19 +29,27 @@ func (a *App) menu() *menu.Menu {
 
 	app := m.AddSubmenu("Mouse Party") // the first menu is the app's, whatever it's called
 	app.AddText("About Mouse Party", nil, cb(a.about))
-	if a.update.state == "ready" {
+	switch {
+	case !selfUpdates: // Windows: no updates (proc_windows.go)
+	case a.update.state == "ready":
 		app.AddText("Restart to Update to "+a.update.latest, nil, cb(func() { go a.RestartToUpdate() }))
-	} else {
+	default:
 		app.AddText("Check for Updates…", nil, cb(func() { a.CheckForUpdates(); a.ask("updates") }))
 	}
 	app.AddSeparator()
 	app.AddText("Settings…", keys.CmdOrCtrl(","), cb(func() { a.ask("prefs") })).Disabled = a.locked
 	app.AddSeparator()
-	app.AddText("Hide Mouse Party", keys.CmdOrCtrl("h"), cb(func() { runtime.Hide(a.ctx) }))
-	app.AddText("Hide Others", keys.Combo("h", keys.CmdOrCtrlKey, keys.OptionOrAltKey), cb(nativeHideOthers))
-	app.AddText("Show All", nil, cb(nativeShowAll))
-	app.AddSeparator()
-	app.AddText("Quit Mouse Party", keys.CmdOrCtrl("q"), cb(func() { runtime.Quit(a.ctx) })) // asks first while playing (beforeClose)
+	if onMac {
+		app.AddText("Hide Mouse Party", keys.CmdOrCtrl("h"), cb(func() { runtime.Hide(a.ctx) }))
+		app.AddText("Hide Others", keys.Combo("h", keys.CmdOrCtrlKey, keys.OptionOrAltKey), cb(nativeHideOthers))
+		app.AddText("Show All", nil, cb(nativeShowAll))
+		app.AddSeparator()
+	}
+	quit := "Quit Mouse Party"
+	if !onMac {
+		quit = "Exit"
+	}
+	app.AddText(quit, keys.CmdOrCtrl("q"), cb(func() { runtime.Quit(a.ctx) })) // asks first while playing (beforeClose)
 
 	edit := m.AddSubmenu("Edit")
 	undo, redo := "Undo", "Redo"
@@ -54,12 +62,14 @@ func (a *App) menu() *menu.Menu {
 	// in a sheet's field, its typing; otherwise the list's removals (the window decides: party.ts)
 	edit.AddText(undo, keys.CmdOrCtrl("z"), cb(func() { a.emit("edit", "undo") }))
 	edit.AddText(redo, keys.Combo("z", keys.CmdOrCtrlKey, keys.ShiftKey), cb(func() { a.emit("edit", "redo") }))
-	edit.AddSeparator()
-	for _, e := range []struct{ label, key, action string }{
-		{"Cut", "x", "cut:"}, {"Copy", "c", "copy:"}, {"Paste", "v", "paste:"}, {"Select All", "a", "selectAll:"},
-	} {
-		action := e.action
-		edit.AddText(e.label, keys.CmdOrCtrl(e.key), cb(func() { nativeSend(action) }))
+	if onMac { // on Windows the web view does these itself, and a menu's shortcut would take Ctrl+C from it
+		edit.AddSeparator()
+		for _, e := range []struct{ label, key, action string }{
+			{"Cut", "x", "cut:"}, {"Copy", "c", "copy:"}, {"Paste", "v", "paste:"}, {"Select All", "a", "selectAll:"},
+		} {
+			action := e.action
+			edit.AddText(e.label, keys.CmdOrCtrl(e.key), cb(func() { nativeSend(action) }))
+		}
 	}
 
 	party := m.AddSubmenu("Party")
@@ -79,7 +89,9 @@ func (a *App) menu() *menu.Menu {
 		party.AddText("Use Encryption…", nil, cb(func() { a.ask("on") }))
 	}
 
-	m.Append(menu.WindowMenu())
+	if onMac {
+		m.Append(menu.WindowMenu())
+	}
 
 	help := m.AddSubmenu("Help") // macOS adds its search field to a menu called Help
 	help.AddText("Mouse Party Help", keys.CmdOrCtrl("?"), cb(func() { runtime.BrowserOpenURL(a.ctx, helpURL) }))
@@ -109,10 +121,17 @@ func (a *App) emit(name string, data ...any) {
 // about: the Mac's own About panel (the icon, the name, the version from Info.plist): who made it, and
 // the open source it's made with (licenses/README.md has every one, and its licence)
 func (a *App) about() {
-	nativeAbout("By Paul Ford\n\n" +
+	credits := "By Paul Ford\n\n" +
 		"Made with FFmpeg, x264, Opus, libass, FreeType, HarfBuzz, FriBidi, MediaMTX, cloudflared, pandoc, " +
 		"Python, Datasette, SQLite, Wails, wazero, pdfcpu, hls.js, pdf.js, Tiny Little Office, Lucide " +
-		"and the ENABLE word list.\n\nMIT licence, no warranty.")
+		"and the ENABLE word list.\n\nMIT licence, no warranty."
+	if onMac {
+		nativeAbout(credits)
+	} else if a.ctx != nil { // Windows has no standard About panel: a message box says the same
+		ctx := a.ctx
+		go runtime.MessageDialog(ctx, runtime.MessageDialogOptions{Type: runtime.InfoDialog,
+			Title: "About Mouse Party", Message: "Mouse Party " + version + "\n\n" + credits})
+	}
 }
 
 // ---------- the log ----------

@@ -32,7 +32,6 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/ftrain/mouseparty/apps"
@@ -41,12 +40,6 @@ import (
 const (
 	httpPort = 8765 // page, handshake, HLS fallback, chat
 	icePort  = 8189 // WebRTC media, UDP and TCP
-	// MediaMTX and cloudflared are started under this, so they stop when the app
-	// does, even if the app is killed or crashes: the app holds the write end of
-	// their stdin; when it goes, the watcher's read ends and it stops the tool. (A
-	// shell gives background jobs /dev/null for stdin, hence the explicit fd 3.)
-	watchdog = `exec 3<&0; "$@" 3<&- & child=$!; (read _ <&3; kill $child 2>/dev/null) & watcher=$!; ` +
-		`exec 3<&-; wait $child; code=$?; kill $watcher 2>/dev/null; exit $code`
 )
 
 func freePort() int {
@@ -373,45 +366,6 @@ func (h *Host) Stop() {
 	h.mu.Unlock()
 }
 
-// killLeftovers: a session that crashed or was force-quit leaves MediaMTX (and
-// cloudflared) running, holding the ports. Ours are recognisable: MediaMTX runs a
-// mouseparty-host-* config, cloudflared tunnels to our port. Only orphans go (parent
-// 1: their app is gone); a live session's belong to its app, which may be another
-// copy of this one, or a self-test running beside it.
-func (h *Host) killLeftovers() {
-	out, err := exec.Command("ps", "-axo", "pid=,ppid=,command=").Output()
-	if err != nil {
-		return
-	}
-	tunnel := fmt.Sprintf("tunnel --no-autoupdate --url http://127.0.0.1:%d", h.HTTPPort)
-	for _, line := range strings.Split(string(out), "\n") {
-		f := strings.Fields(line)
-		if len(f) < 3 || f[1] != "1" {
-			continue
-		}
-		cmd := strings.Join(f[2:], " ")
-		if (strings.Contains(cmd, "mediamtx") && strings.Contains(cmd, "/mouseparty-host-") && strings.HasSuffix(cmd, "mediamtx.yml")) ||
-			(strings.Contains(cmd, "cloudflared") && strings.HasSuffix(cmd, tunnel)) {
-			h.Log("Stopping a leftover from an earlier session: " + filepath.Base(f[2]))
-			var pid int
-			fmt.Sscan(f[0], &pid)
-			syscall.Kill(pid, syscall.SIGTERM)
-		}
-	}
-	time.Sleep(300 * time.Millisecond)
-	// and the folders crashed sessions left (their config; never a key), unless something still uses them
-	out, err = exec.Command("ps", "-axo", "command=").Output()
-	if err != nil {
-		return
-	}
-	dirs, _ := filepath.Glob(filepath.Join(os.TempDir(), "mouseparty-host-*"))
-	for _, d := range dirs {
-		if !strings.Contains(string(out), d) {
-			os.RemoveAll(d)
-		}
-	}
-}
-
 func (h *Host) Running() bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -454,9 +408,8 @@ func (h *Host) viewers() int {
 // writes beside itself, like MediaMTX's certificates, goes with the session)
 func (h *Host) spawn(name, bin string, args ...string) (*exec.Cmd, error) {
 	run, argv := h.boxFor(name, bin).argv(args...)
-	cmd := exec.Command("/bin/sh", append([]string{"-c", watchdog, "mouseparty-watch", run}, argv...)...)
+	cmd := watched(run, argv) // stops when the app does (proc_unix.go, proc_windows.go)
 	cmd.Dir = h.tmp
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err
@@ -469,6 +422,7 @@ func (h *Host) spawn(name, bin string, args ...string) (*exec.Cmd, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
+	started(cmd)
 	h.mu.Lock()
 	h.procs = append(h.procs, cmd)
 	h.stdins[cmd] = stdin // held open: when the app goes, so does this, and the watchdog stops the tool
@@ -603,23 +557,6 @@ func (h *Host) startMediaMTX(public, standby string) error {
 			h.Log("MediaMTX stopped as it started; trying it on other ports.")
 		}
 	}
-}
-
-// stopGroup stops a watched tool and its watcher: they share a process group
-func stopGroup(cmd *exec.Cmd) {
-	if cmd.Process == nil {
-		return
-	}
-	pid := cmd.Process.Pid
-	if syscall.Kill(-pid, syscall.SIGTERM) != nil {
-		return
-	}
-	for end := time.Now().Add(5 * time.Second); time.Now().Before(end); time.Sleep(100 * time.Millisecond) {
-		if syscall.Kill(-pid, 0) != nil {
-			return
-		}
-	}
-	syscall.Kill(-pid, syscall.SIGKILL)
 }
 
 func waitFor(port int, timeout time.Duration) error {
