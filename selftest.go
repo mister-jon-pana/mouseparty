@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"io"
 	"mime"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/ncruces/go-sqlite3"
 )
 
@@ -58,6 +60,7 @@ func selftest() int {
 	check("only apps' scripts", func() (string, error) { return statusIs(base+"apps/nope.js", 404) })
 	check("the documents' editors come as JavaScript", func() (string, error) { return typeIs(base+"office/editors.js", "text/javascript") })
 	check("documents are drawn by office.js", func() (string, error) { return typeIs(base+"apps/office.js", "text/javascript") })
+	check("chat: a viewer joins, opens a game, and stays", func() (string, error) { return chatCheck(base) })
 	if pythonHome() == "" {
 		fmt.Println("skip  Datasette: this build has no Python (scripts/build_python.sh)")
 	} else if db, err := selftestDB(); err == nil {
@@ -119,6 +122,53 @@ func selftest() int {
 	}
 	fmt.Println("self-test FAILED")
 	return 1
+}
+
+// chatCheck: a viewer's chat socket, as a page opens it: hello, a name taken, a game opened
+// and its first view, and the socket still open a few seconds on
+func chatCheck(base string) (string, error) {
+	u := "ws" + strings.TrimPrefix(base, "http") + "ws"
+	c, _, err := websocket.DefaultDialer.Dial(u, nil)
+	if err != nil {
+		return "", fmt.Errorf("dial %s: %w", u, err)
+	}
+	defer c.Close()
+	read := func(want string, within time.Duration) (map[string]any, error) {
+		c.SetReadDeadline(time.Now().Add(within))
+		for {
+			_, b, err := c.ReadMessage()
+			if err != nil {
+				return nil, fmt.Errorf("waiting for %s: %w", want, err)
+			}
+			var m map[string]any
+			if err := json.Unmarshal(b, &m); err != nil {
+				return nil, fmt.Errorf("not JSON (%v): %.200s", err, b)
+			}
+			if m["type"] == want {
+				return m, nil
+			}
+		}
+	}
+	if _, err := read("hello", 5*time.Second); err != nil {
+		return "", err
+	}
+	c.WriteJSON(map[string]any{"type": "join", "name": "Selftest"})
+	if _, err := read("online", 5*time.Second); err != nil {
+		return "", err
+	}
+	c.WriteJSON(map[string]any{"type": "app_open", "name": "hearts"})
+	if _, err := read("apps", 5*time.Second); err != nil {
+		return "", err
+	}
+	c.SetReadDeadline(time.Now().Add(3 * time.Second))
+	for { // still open: nothing but timing out may end this
+		if _, _, err := c.ReadMessage(); err != nil {
+			if ne, ok := err.(net.Error); ok && ne.Timeout() {
+				return "joined, Hearts opened, still connected", nil
+			}
+			return "", fmt.Errorf("the socket closed: %w", err)
+		}
+	}
 }
 
 // selftestDB: a small database to put up
