@@ -314,13 +314,13 @@ func (a *App) view() View {
 		} else if link == a.host.URLs()["lan"] {
 			v.LinkNote = "Wi-Fi only"
 		}
-	case (a.hostFailed != "" || (a.host != nil && a.host.Running())) && len(a.cfg.Queue) > 0:
+	case a.hostFailed != "" || (a.host != nil && a.host.Running()):
 		v.LinkPress, v.LinkNote = true, "No link – try again" // hosting, but Cloudflare said no
 		if strings.Contains(a.hostFailed, "address already in use") {
 			v.LinkNote = "Port in use – try again" // something else has the site's or MediaMTX's port
 		}
 	default:
-		v.LinkPress = len(a.cfg.Queue) > 0
+		v.LinkPress = true // with nothing in the list, a party for the games and the chat alone
 	}
 	for i, it := range a.cfg.Queue {
 		title := it.title()
@@ -1313,8 +1313,8 @@ func (a *App) linkClicked() {
 		}
 		a.copiedUntil = time.Now().Add(1500 * time.Millisecond)
 		a.after(1600*time.Millisecond, func() {})
-	} else if a.state() == "nolink" {
-		a.hostStart()
+	} else if st := a.state(); st == "nolink" || (st == "empty" && (a.host == nil || !a.host.Running())) {
+		a.hostStart() // the list empty: a party for the games and the chat, the stand-by card on screen
 	} else if h := a.host; h != nil && h.Running() && h.Cloudflared != "" && !a.hostStarting && !a.tunnelRetry {
 		a.tunnelRetry = true // hosting, but Cloudflare said no: ask it again
 		go func() {

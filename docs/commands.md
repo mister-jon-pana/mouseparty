@@ -71,7 +71,7 @@ Besides those, the app moves on its own (the link made, a countdown over, a movi
 | `ClearPlayed` | Party > Clear Played Files (⌘R): every row above the one playing, or next to play | every state |
 | `UndoRemove` | Edit > Undo (⌘Z): the rows last taken out, back where they were (hosting again if the list was empty) | every state |
 | `RedoRemove` | Edit > Redo (⇧⌘Z): out again | every state |
-| `LinkClicked` | copy the link, or try again for one | every state |
+| `LinkClicked` | copy the link, or try again for one (with the list empty: host the games and the chat alone) | every state |
 | `SetSettingsText` | Party > Settings: the settings and the list, as JSON (off the app's goroutine; while playing it says Stop first) | every state |
 | `AddPaths` | files dropped (off the app's goroutine: no immediate state) | every state |
 | `SetPrefs` | Party > Settings (⌘,): a setting changed in the Settings window, kept at once (off the app's goroutine: no immediate state) | every state |

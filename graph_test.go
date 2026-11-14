@@ -92,7 +92,7 @@ var windowGraph = []windowCommand{
 	{"UndoRemove", windowStates, merge(each(windowStates, "same"), each([]string{"empty"}, "empty", "linking", "nolink", "ready")),
 		"Edit > Undo (⌘Z): the rows last taken out, back where they were (hosting again if the list was empty)"},
 	{"RedoRemove", windowStates, each(windowStates, "same", "empty", "stopping", "between"), "Edit > Redo (⇧⌘Z): out again"},
-	{"LinkClicked", windowStates, merge(each(windowStates, "same"), each([]string{"nolink"}, "linking", "nolink")), "copy the link, or try again for one"},
+	{"LinkClicked", windowStates, merge(each(windowStates, "same"), each([]string{"nolink"}, "linking", "nolink")), "copy the link, or try again for one (with the list empty: host the games and the chat alone)"},
 	{"SetSettingsText", windowStates, nil, "Party > Settings: the settings and the list, as JSON (off the app's goroutine; while playing it says Stop first)"},
 	{"AddPaths", windowStates, nil, "files dropped (off the app's goroutine: no immediate state)"},
 	{"SetPrefs", windowStates, nil, "Party > Settings (⌘,): a setting changed in the Settings window, kept at once (off the app's goroutine: no immediate state)"},
