@@ -499,8 +499,11 @@ function setChatHidden(hidden) {
 byId("hideChat").addEventListener("click", () => setChatHidden(true));
 setChatHidden(chatHidden);
 const app = byId("app");
+let laidOutWidth = 0;
 function layout() {
 	const w = window.innerWidth, h = window.innerHeight;
+	if ((document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement) && w === laidOutWidth && app.dataset.mode) return;
+	laidOutWidth = w;
 	let m;
 	if (w > h && h <= 500) m = "overlay";
 	else if (w >= 900 && w > h) m = "side";

@@ -506,9 +506,16 @@ setChatHidden(chatHidden);
 // floats over it).
 const app = byId('app');
 
+let laidOutWidth = 0;
 function layout() {
     const w = window.innerWidth,
         h = window.innerHeight;
+    // The on-screen keyboard (Android resizes the page for it) only takes height: an upright phone
+    // with it up is no phone on its side. Switching then moved the box being typed in, which put
+    // the keyboard away, which switched back: the chat flashed and nobody could type a name.
+    const typing = document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement;
+    if (typing && w === laidOutWidth && app.dataset.mode) return;
+    laidOutWidth = w;
     let m;
     // a phone on its side, a desktop, or upright
     if (w > h && h <= 500) m = 'overlay';
