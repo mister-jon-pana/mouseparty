@@ -61,6 +61,29 @@ func selftest() int {
 	check("the documents' editors come as JavaScript", func() (string, error) { return typeIs(base+"office/editors.js", "text/javascript") })
 	check("documents are drawn by office.js", func() (string, error) { return typeIs(base+"apps/office.js", "text/javascript") })
 	check("chat: a viewer joins, opens a game, and stays", func() (string, error) { return chatCheck(base) })
+	if os.Getenv("SELFTEST_TUNNEL") != "" { // through a Cloudflare quick tunnel too, as a friend's phone reaches it
+		h.Cloudflared = firstTool("cloudflared")
+		check("a Cloudflare link", func() (string, error) {
+			if !h.ShareViaCloudflare() {
+				return "", fmt.Errorf("no tunnel")
+			}
+			return h.URLs()["cloudflare"], nil
+		})
+		if link := h.URLs()["cloudflare"]; link != "" {
+			check("its page", func() (string, error) {
+				var err error
+				for range 20 {
+					var r string
+					if r, err = statusIs(link, 200); err == nil {
+						return r, nil
+					}
+					time.Sleep(3 * time.Second)
+				}
+				return "", err
+			})
+			check("chat through it", func() (string, error) { return chatCheck(link) })
+		}
+	}
 	if pythonHome() == "" {
 		fmt.Println("skip  Datasette: this build has no Python (scripts/build_python.sh)")
 	} else if db, err := selftestDB(); err == nil {

@@ -93,6 +93,16 @@ jobs:
           Get-Content selftest.txt, selftest-err.txt
           if ($p.ExitCode -ne 0) { throw "self-test failed ($($p.ExitCode))" }
 
+      - name: Self-test through a Cloudflare link (as a friend's phone reaches it; the network can make this flaky)
+        continue-on-error: true
+        timeout-minutes: 5
+        run: |
+          $env:SELFTEST_TUNNEL = '1'
+          $p = Start-Process -FilePath dist\MouseParty\MouseParty.exe -ArgumentList '--selftest' -Wait -PassThru -NoNewWindow `
+            -RedirectStandardOutput tunnel.txt -RedirectStandardError tunnel-err.txt
+          Get-Content tunnel.txt, tunnel-err.txt
+          if ($p.ExitCode -ne 0) { throw "self-test through the tunnel failed ($($p.ExitCode))" }
+
       - name: go vet
         continue-on-error: true
         run: go vet ./...
