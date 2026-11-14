@@ -1488,7 +1488,8 @@ func (a *App) beforeClose(ctx context.Context) bool {
 	answer, err := runtime.MessageDialog(ctx, runtime.MessageDialogOptions{Type: runtime.QuestionDialog,
 		Title: "Quit", Message: "Something is playing. Stop it and quit?", Buttons: []string{"Quit", "Cancel"},
 		DefaultButton: "Quit", CancelButton: "Cancel"})
-	return err != nil || answer != "Quit"
+	// Windows' message box has no buttons of our own: its question asks Yes or No
+	return err != nil || (answer != "Quit" && answer != "Yes")
 }
 
 // shutdown stops ffmpeg and hosting; they run in their own process groups and would outlive us
