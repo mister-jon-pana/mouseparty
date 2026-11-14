@@ -208,7 +208,7 @@ const KEYS: [string, string][] = [
     ['⌫', 'Remove it'],
     ['⌘Z  ⇧⌘Z', 'Undo, redo'],
     ['← →', 'Turn the page'],
-    ['⌘L', 'Add a download link'],
+    ['⌘L', 'Add a link: a file, a video site page or a live stream'],
     ['⌘R', 'Clear played files'],
     ['⌘,', 'Settings'],
     ['⌥⌘L', 'Show the log'],
@@ -261,9 +261,9 @@ function linkSheet() {
     let site = '';
     let filled = { user: '', pass: '' }; // what the sheet filled in itself (typed over, it's left alone)
     const inputs = show({
-        title: 'Add Download Link',
+        title: 'Add Link',
         fields: [
-            { name: 'link', label: 'Link', kind: 'line' },
+            { name: 'link', label: 'Link: a video file, a YouTube (or other video site) page, or a live stream (.m3u8, rtmp://)', kind: 'line' },
             { name: 'user', label: 'Username (if needed)', kind: 'line' },
             { name: 'pass', label: 'Password', kind: 'password' },
             { name: 'save', label: 'Save this login', kind: 'check', hidden: true },

@@ -498,7 +498,7 @@ async function settingsWindow(page) {
     await page.click('#sheet .pref-done');
     await sheetGone(page, 'Done');
     await page.evaluate(() => window.__ask('link'));
-    await sheetUp(page, 'Add Download Link');
+    await sheetUp(page, 'Add Link');
     await page.fill('#sheet [name="link"]', 'https://cdn.example.com/Some.Movie.mkv');
     await until(page, 'filled in the saved login', () => {
         const q = (n) => document.querySelector(`#sheet [name="${n}"]`);
@@ -541,7 +541,7 @@ async function party(page) {
     // Add Download Link: nothing, not a link, then a clip the test serves: a row downloading, then a movie
     const files = await (await fetch(`${base}/files`)).json();
     await page.evaluate(() => window.__ask('link'));
-    await sheetUp(page, 'Add Download Link');
+    await sheetUp(page, 'Add Link');
     await fillSheet(page, { link: ' ' });
     await sheetSays(page, 'no link', 'Paste a link');
     await fillSheet(page, { link: 'Some.Clip.mkv' });

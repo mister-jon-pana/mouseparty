@@ -47,6 +47,8 @@ type Item struct {
 	URL       string        `json:"url,omitempty"`       // a download link (download.go): Path is its download, in the cache
 	Got       bool          `json:"got,omitempty"`       // the download is complete; until then the row is off, counting bytes
 	Cleared   bool          `json:"cleared,omitempty"`   // an earlier Mouse Party's row kept, greyed, when its download was cleared: taken out at start (syncDownloads)
+	Live      bool          `json:"live,omitempty"`      // a live stream (links.go): Path is its link; nothing downloaded, nothing to seek
+	Title     string        `json:"title,omitempty"`     // its name, when the file's isn't it (a live stream, a video site's page)
 	Missing   bool          `json:"-"`                   // its file isn't there now (App.watchFiles)
 	dl        *download     // the download under way (download.go); nil otherwise
 }
@@ -56,6 +58,14 @@ func (it *Item) isDoc() bool { return it.kind() == "pdf" || it.kind() == "db" ||
 
 // paged: a PDF, or another document laid out (by viewers' pages: session.go SetPages), has pages to slide through
 func (it *Item) paged() bool { return (it.kind() == "pdf" || it.kind() == "text") && it.Pages > 0 }
+
+// title: the row's name: its Title, else its file's
+func (it *Item) title() string {
+	if it.Title != "" {
+		return it.Title
+	}
+	return displayTitle(it.Path)
+}
 
 func (it *Item) kind() string {
 	if it.Kind == "" {

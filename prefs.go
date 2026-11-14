@@ -93,7 +93,7 @@ func (a *App) Prefs() Prefs {
 			Sealed: a.party != nil && a.party.sealed, CheckUpdates: a.cfg.CheckUpdates, InstallUpdates: a.cfg.InstallUpdates,
 			Notify: a.cfg.Notify, Update: a.updateStatus()}
 		if it := a.current; it != nil && a.phase == "movie" && it.kind() == "video" {
-			p.SoundFor, p.Sound = displayTitle(it.Path), it.Sound
+			p.SoundFor, p.Sound = it.title(), it.Sound
 		}
 	})
 	p.Cache = a.CacheText()
@@ -162,7 +162,7 @@ func (a *App) setSound(seconds float64) string {
 	}
 	it.Sound = seconds
 	a.save()
-	switch title := displayTitle(it.Path); {
+	switch title := it.title(); {
 	case seconds > 0:
 		a.log(fmt.Sprintf("The sound of %s is %.2f seconds later.", title, seconds))
 	case seconds < 0:

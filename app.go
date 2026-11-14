@@ -323,12 +323,14 @@ func (a *App) view() View {
 		v.LinkPress = len(a.cfg.Queue) > 0
 	}
 	for i, it := range a.cfg.Queue {
-		title := displayTitle(it.Path)
+		title := it.title()
 		if it.Note != "" {
 			title += "  (" + it.Note + ")"
 		}
 		length, icon := "", it.kind()
-		if it.downloading() {
+		if it.Live {
+			length = "LIVE"
+		} else if it.downloading() {
 			icon, length = "download", downloadNote(it)
 		} else if it.kind() == "pdf" {
 			length = fmt.Sprintf("%d pages", it.Pages)
@@ -842,7 +844,7 @@ func (a *App) startCountdown(seconds int) {
 	a.stopRequest, a.jumpTo = false, -1
 	a.phase = "countdown"
 	a.countdownEnd = time.Now().Add(time.Duration(seconds) * time.Second)
-	args, temps := countdownCommand(seconds, displayTitle(a.current.Path), a.opts())
+	args, temps := countdownCommand(seconds, a.current.title(), a.opts())
 	if err := a.player.Start(args, temps, 0, ""); err != nil {
 		a.log("Could not start ffmpeg: " + err.Error())
 		a.current, a.phase, a.playing = nil, "", false
@@ -857,9 +859,9 @@ func (a *App) startCurrent(skip float64) {
 	var err error
 	if it.isDoc() {
 		a.phase = "doc"
-		a.host.SetDocument(document{Token: strconv.FormatInt(time.Now().UnixMilli(), 10), Path: it.Path, Title: displayTitle(it.Path),
+		a.host.SetDocument(document{Token: strconv.FormatInt(time.Now().UnixMilli(), 10), Path: it.Path, Title: it.title(),
 			Kind: it.kind(), Pages: it.Pages, Page: max(1, it.Page), At: it.At})
-		args, temps := documentCommand(it.kind(), displayTitle(it.Path), a.opts())
+		args, temps := documentCommand(it.kind(), it.title(), a.opts())
 		err = a.player.Start(args, temps, 0, "")
 	} else {
 		a.phase = "movie"
@@ -882,7 +884,7 @@ func (a *App) stop() {
 }
 
 func (a *App) seek(seconds float64) {
-	if a.state() != "movie" {
+	if a.state() != "movie" || (a.current != nil && a.current.Live) { // a live stream goes on as it goes
 		return
 	}
 	if far, ok := downloadedSeconds(a.current); ok && seconds > far { // only as far as the download has come
@@ -917,7 +919,7 @@ func (a *App) playedTo() float64 {
 // keepPlace: the video up now remembers how far it got (Stop, a quit, another row), so it plays on from there
 func (a *App) keepPlace() {
 	it := a.current
-	if a.phase != "movie" || it == nil || it.kind() != "video" {
+	if a.phase != "movie" || it == nil || it.kind() != "video" || it.Live {
 		return
 	}
 	at := a.playedTo()
@@ -1195,6 +1197,9 @@ func (a *App) burn(it *Item) Burn {
 
 // audio: the sound track to play: the one in the Mac's language, else the file's default
 func (a *App) audio(it *Item) *AudioTrack {
+	if it.Live { // a live stream: its first sound, without asking it first
+		return nil
+	}
 	if it.Audio == nil {
 		tracks := audioTracks(it.Path)
 		it.Audio = &tracks
@@ -1221,13 +1226,13 @@ func (a *App) offerSubtitles(it *Item) {
 	if a.host != nil && a.host.Running() {
 		a.host.ClearSubtitles()
 		if it.kind() == "video" { // frames from it, for documents and the graffiti reel
-			a.host.SetShowing(it.Path, displayTitle(it.Path))
+			a.host.SetShowing(it.Path, it.title())
 		} else {
 			a.host.SetShowing("", "")
 		}
-		a.host.SetPlaying(it.Path, displayTitle(it.Path), it.isDoc()) // Stickies: on pages (a database is one page), or moments
+		a.host.SetPlaying(it.Path, it.title(), it.isDoc()) // Stickies: on pages (a database is one page), or moments
 	}
-	if it.isDoc() || subsSettings(it).Mode != "viewers" {
+	if it.isDoc() || it.Live || subsSettings(it).Mode != "viewers" { // a live stream: no tracks looked for (it would mean waiting on it)
 		return
 	}
 	offset := subsSettings(it).Offset
@@ -1389,7 +1394,9 @@ func (a *App) watchFiles() {
 		var paths []string
 		a.wait(func() {
 			for _, it := range a.cfg.Queue {
-				paths = append(paths, it.Path)
+				if !it.Live { // a link: nothing on disk to look for
+					paths = append(paths, it.Path)
+				}
 			}
 		})
 		gone := map[string]bool{}
@@ -1428,7 +1435,7 @@ func (a *App) schedule() []ScheduleRow {
 		}
 	}
 	for _, it := range q[pos:] {
-		r := ScheduleRow{Title: displayTitle(it.Path), Duration: int64(it.Duration + 0.5)}
+		r := ScheduleRow{Title: it.title(), Duration: int64(it.Duration + 0.5)}
 		if start != nil {
 			s := int64(*start + 0.5)
 			r.Start = &s

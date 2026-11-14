@@ -287,9 +287,34 @@ func shortNetError(err error) string {
 // link's site (logins.go): kept in the party file when save is set, else only until the app quits; a
 // link already in the list given one is tried again with it.
 func (a *App) AddURL(link, user, pass string, save bool) string {
+	if lu, err := url.Parse(strings.TrimSpace(link)); err == nil && liveLink(lu) { // a live stream (links.go)
+		return a.addLive(lu.String(), streamTitle(lu))
+	}
 	u, login, why := checkLink(link)
 	if why != "" {
 		return why
+	}
+	named := "" // the file's name, when the link's isn't it (a video site's page)
+	if !shareable(linkName(u)) && notArchive(u) {
+		switch v, err := findSiteVideo(u.String()); {
+		case err == nil && v.Live:
+			title := v.Title
+			if title == "" {
+				title = streamTitle(u)
+			}
+			return a.addLive(v.URL, title)
+		case err == nil:
+			nu, perr := url.Parse(v.URL)
+			if perr != nil {
+				return "The video's link didn't make sense: " + perr.Error()
+			}
+			u = nu
+			if v.Title != "" {
+				named = cleanName(v.Title) + ".mp4"
+			}
+		case !unsupported(err):
+			return "Couldn't find the video there: " + err.Error()
+		}
 	}
 	links := []*url.URL{u}
 	if item, file := archiveItem(u); item != "" { // an Internet Archive page: its videos' own links (archive.go)
@@ -332,7 +357,11 @@ func (a *App) AddURL(link, user, pass string, save bool) string {
 						continue each
 					}
 				}
-				it := &Item{URL: u.String(), Path: filepath.Join(downloadsDir(), downloadKey(u.String()), linkName(u))}
+				name := linkName(u)
+				if named != "" && len(links) == 1 {
+					name = named
+				}
+				it := &Item{URL: u.String(), Path: filepath.Join(downloadsDir(), downloadKey(u.String()), name)}
 				it.Kind = kindOf(it.Path)
 				a.editQueue(func(q []*Item) []*Item { return append(q, it) }, nil)
 				a.log("Downloading " + filepath.Base(it.Path) + " from " + u.Hostname())

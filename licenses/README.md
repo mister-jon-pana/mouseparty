@@ -12,6 +12,7 @@ its authors publish it, and the built app carries this whole folder in
 | **ffmpeg**, Mouse Party's own build (`scripts/build_ffmpeg.sh`) | 9.0.2 | **GPL-2.0-or-later** as built (it includes x264); FFmpeg itself is LGPL-2.1-or-later | see below |
 | [MediaMTX](https://github.com/bluenviron/mediamtx) | 1.21.3 | MIT | `mediamtx/` |
 | [cloudflared](https://github.com/cloudflare/cloudflared) | 2026.10.3 | Apache-2.0 | `cloudflared/` |
+| [yt-dlp](https://github.com/yt-dlp/yt-dlp) | 2026.10.26 | Unlicense (public domain); the Windows build only | `yt-dlp/` |
 | [pandoc](https://pandoc.org), its own WebAssembly release build (`pandoc.wasm`, `scripts/fetch_pandoc.sh`), run inside the app by wazero: documents brought in (`pandoc.go`) | 3.13 | **GPL-2.0-or-later** (with the parts its `COPYRIGHT` lists under their own) | `pandoc/`; source below |
 
 The ffmpeg in the app is built statically from these, each a pinned release

@@ -183,6 +183,9 @@ func ffmpegBox(bin string, own, args []string) *box {
 			if _, err := os.Stat(a); err == nil || filepath.IsAbs(a) { // a file, not a source ffmpeg makes up (lavfi)
 				b.read(a)
 			}
+			if strings.Contains(a, "://") { // a live stream's link (links.go): out to the network
+				b.lookups().allow(`(allow network-outbound)`)
+			}
 		}
 		if port, ok := strings.CutPrefix(a, "rtsp://127.0.0.1:"); ok {
 			port, _, _ = strings.Cut(port, "/")

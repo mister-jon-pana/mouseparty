@@ -213,7 +213,7 @@ const KEYS = [
 	["⌫", "Remove it"],
 	["⌘Z  ⇧⌘Z", "Undo, redo"],
 	["← →", "Turn the page"],
-	["⌘L", "Add a download link"],
+	["⌘L", "Add a link: a file, a video site page or a live stream"],
 	["⌘R", "Clear played files"],
 	["⌘,", "Settings"],
 	["⌥⌘L", "Show the log"],
@@ -269,11 +269,11 @@ function linkSheet() {
 		pass: ""
 	};
 	const inputs = show({
-		title: "Add Download Link",
+		title: "Add Link",
 		fields: [
 			{
 				name: "link",
-				label: "Link",
+				label: "Link: a video file, a YouTube (or other video site) page, or a live stream (.m3u8, rtmp://)",
 				kind: "line"
 			},
 			{
