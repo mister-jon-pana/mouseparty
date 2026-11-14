@@ -147,6 +147,38 @@ What a page sends each app, as `{"type": "app", "id", "kind", ...}`.
 | Polls | `ask` | `question` (str), `options` (strs) |
 |  | `vote` | `i` (int) |
 |  | `close` |  |
+| Hearts | `pass` | `cards` (strs) |
+|  | `play` | `card` (str) |
+|  | `join` |  |
+|  | `leave` |  |
+|  | `start` |  |
+| Color Match | `play` | `card` (str), `color` (str) |
+|  | `draw` |  |
+|  | `pass` |  |
+|  | `join` |  |
+|  | `leave` |  |
+|  | `start` |  |
+| Cribbage | `crib` | `cards` (strs) |
+|  | `peg` | `card` (str) |
+|  | `join` |  |
+|  | `leave` |  |
+|  | `start` |  |
+| Canasta | `draw` |  |
+|  | `pile` | `cards` (strs) |
+|  | `meld` | `cards` (strs), `rank` (str) |
+|  | `discard` | `card` (str) |
+|  | `join` |  |
+|  | `leave` |  |
+|  | `start` |  |
+| Mahjong | `discard` | `tile` (str) |
+|  | `kong` | `tile` (str) |
+|  | `chow` | `tiles` (strs) |
+|  | `win` |  |
+|  | `pung` |  |
+|  | `pass` |  |
+|  | `join` |  |
+|  | `leave` |  |
+|  | `start` |  |
 | Document | `edit` | `base` (int), `eid` (str), `ops` (ops) |
 |  | `snap` | `seq` (int), `text` (str) |
 |  | `seed` | `text` (str) |

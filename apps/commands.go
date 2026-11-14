@@ -71,6 +71,33 @@ var Commands = map[string][]Command{
 		{"see", []Field{{Name: "i", Type: "int", Hi: 12}}},
 		{"exile", []Field{{Name: "i", Type: "int", Hi: 12}}},
 	}, lobbyCommands...),
+	"hearts": append([]Command{
+		{"pass", []Field{{Name: "cards", Type: "strs", Max: 2}}},
+		{"play", []Field{{Name: "card", Type: "str", Max: 2}}},
+	}, lobbyCommands...),
+	"colormatch": append([]Command{
+		{"play", []Field{{Name: "card", Type: "str", Max: 2}, {Name: "color", Type: "str", Max: 1}}},
+		{Kind: "draw"},
+		{Kind: "pass"},
+	}, lobbyCommands...),
+	"cribbage": append([]Command{
+		{"crib", []Field{{Name: "cards", Type: "strs", Max: 2}}},
+		{"peg", []Field{{Name: "card", Type: "str", Max: 2}}},
+	}, lobbyCommands...),
+	"canasta": append([]Command{
+		{Kind: "draw"},
+		{"pile", []Field{{Name: "cards", Type: "strs", Max: 2}}},
+		{"meld", []Field{{Name: "cards", Type: "strs", Max: 2}, {Name: "rank", Type: "str", Max: 1}}},
+		{"discard", []Field{{Name: "card", Type: "str", Max: 2}}},
+	}, lobbyCommands...),
+	"mahjong": append([]Command{
+		{"discard", []Field{{Name: "tile", Type: "str", Max: 2}}},
+		{"kong", []Field{{Name: "tile", Type: "str", Max: 2}}},
+		{"chow", []Field{{Name: "tiles", Type: "strs", Max: 2}}},
+		{Kind: "win"},
+		{Kind: "pung"},
+		{Kind: "pass"},
+	}, lobbyCommands...),
 	"poll": {
 		{"ask", []Field{{Name: "question", Type: "str", Max: 80}, {Name: "options", Type: "strs", Max: 80}}},
 		{"vote", []Field{{Name: "i", Type: "int", Hi: 3}}},

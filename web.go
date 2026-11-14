@@ -363,7 +363,7 @@ func (h *Host) docFile(w http.ResponseWriter, r *http.Request) {
 
 // appScript: a script an app is drawn by (apps.Kind.Script), or what they share
 func appScript(name string) bool {
-	if name == "lib" || name == "icons" {
+	if name == "lib" || name == "icons" || name == "cards" { // cards: what the card and tile games share
 		return true
 	}
 	for _, k := range apps.Kinds {

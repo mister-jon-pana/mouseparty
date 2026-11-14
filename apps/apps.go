@@ -86,6 +86,12 @@ var Kinds = []Kind{
 	{"spies", "Spies", "venetian-mask", false, "big", 4, newSpies},
 	{"werewolf", "Werewolf", "moon-star", false, "big", 4, newWerewolf},
 	{"poll", "Polls", "chart-column", false, "small", 1, newPoll},
+	// card and tile games for up to four, bots in the empty seats (table.go)
+	{"hearts", "Hearts", "heart", false, "big", 1, newHearts},
+	{"colormatch", "Color Match", "diamond", false, "big", 1, newColorMatch},
+	{"cribbage", "Cribbage", "club", false, "big", 1, newCribbage},
+	{"canasta", "Canasta", "spade", false, "big", 1, newCanasta},
+	{"mahjong", "Mahjong", "layers", false, "big", 1, newMahjong},
 	// documents everyone edits at once (office.go), and the graffiti reel
 	{"write", "Document", "file-text", false, "big", 1, newOffice("write")},
 	{"outline", "Outline", "list-tree", false, "big", 1, newOffice("outline")},
